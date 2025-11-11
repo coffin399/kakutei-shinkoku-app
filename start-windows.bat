@@ -35,7 +35,17 @@ if not exist node_modules (
     exit /b 1
   )
 ) else (
-  echo    Existing node_modules detected. Skipping npm install.
+  if not exist node_modules\.bin\next (
+    echo    node_modules exists but Next CLI is missing. Running npm install to repair...
+    call npm install
+    if errorlevel 1 (
+      echo [ERROR] npm install failed. Please review the log above.
+      pause
+      exit /b 1
+    )
+  ) else (
+    echo    Existing node_modules detected. Skipping npm install.
+  )
 )
 
 echo.
