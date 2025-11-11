@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type Section = {
   step: string;
   title: string;
@@ -109,13 +111,21 @@ export default function Home() {
                 モダンでスタイリッシュな UI が提出までのステップをガイドします。
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button className="group inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-base font-semibold text-slate-950 transition hover:bg-emerald-400">
-                  今すぐセットアップ
-                  <span className="translate-y-px text-lg transition group-hover:translate-x-1">→</span>
-                </button>
-                <button className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-base font-medium text-white/90 transition hover:border-white/40 hover:text-white">
-                  機能デモを見る
-                </button>
+                <Link
+                  className="group inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-base font-semibold text-slate-950 transition hover:bg-emerald-400"
+                  href="/outputs"
+                >
+                  出力センターを開く
+                  <span className="translate-y-px text-lg transition group-hover:translate-x-1">
+                    →
+                  </span>
+                </Link>
+                <Link
+                  className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-base font-medium text-white/90 transition hover:border-white/40 hover:text-white"
+                  href="/blue"
+                >
+                  青色帳簿を見る
+                </Link>
               </div>
             </div>
             <div className="grid w-full max-w-md gap-4 rounded-2xl border border-white/10 bg-slate-900/60 p-6 shadow-2xl shadow-emerald-500/10">

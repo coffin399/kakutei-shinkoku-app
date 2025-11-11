@@ -49,18 +49,25 @@ if not exist node_modules (
 )
 
 echo.
-echo 2) Starting the development server...
-call npm run dev
-
+echo 2) Starting the development server in a new window...
+start "kakutei-shinkoku-app" cmd /c "cd /d %CD% && npm run dev"
 if errorlevel 1 (
   echo.
-  echo [ERROR] Failed to start the development server.
+  echo [ERROR] Failed to launch npm run dev window.
   pause
   exit /b 1
 )
 
 echo.
-echo Development server has stopped.
+echo Waiting for the server to come online...
+timeout /t 4 >nul
+
+echo Opening http://localhost:3000 in your default browser.
+start "" http://localhost:3000
+
+echo.
+echo The development server is running in a separate window.
+echo Press any key to close this launcher (the dev server will keep running).
 pause
 popd
 endlocal
