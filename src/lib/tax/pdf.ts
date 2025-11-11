@@ -1,4 +1,4 @@
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import type { TaxReturnSnapshot } from "./types";
 
 const TEMPLATE_URL =
@@ -23,16 +23,21 @@ async function loadTemplate(): Promise<Uint8Array> {
   return templateCache;
 }
 
-async function loadFont(): Promise<Uint8Array> {
+async function loadFont(): Promise<Uint8Array | null> {
   if (fontCache) {
     return fontCache;
   }
-  const response = await fetch(FONT_URL);
-  if (!response.ok) {
-    throw new Error("Failed to fetch Japanese font for PDF rendering");
+  try {
+    const response = await fetch(FONT_URL);
+    if (!response.ok) {
+      throw new Error("Failed to fetch Japanese font for PDF rendering");
+    }
+    const buffer = await response.arrayBuffer();
+    fontCache = new Uint8Array(buffer);
+  } catch (error) {
+    console.warn("Falling back to standard font for PDF rendering", error);
+    fontCache = null;
   }
-  const buffer = await response.arrayBuffer();
-  fontCache = new Uint8Array(buffer);
   return fontCache;
 }
 
@@ -48,9 +53,11 @@ export async function generateTaxReturnPdf(
   snapshot: TaxReturnSnapshot
 ): Promise<Uint8Array> {
   const templateBytes = await loadTemplate();
-  const fontBytes = await loadFont();
   const pdfDoc = await PDFDocument.load(templateBytes);
-  const font = await pdfDoc.embedFont(fontBytes);
+  const fontBytes = await loadFont();
+  const font = fontBytes
+    ? await pdfDoc.embedFont(fontBytes)
+    : await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   const drawField = ({ pageIndex, x, y, text, size = 10 }: DrawFieldArgs) => {
     const page = pdfDoc.getPage(pageIndex);
