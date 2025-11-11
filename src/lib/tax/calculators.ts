@@ -128,12 +128,15 @@ export function calculateCryptoPnL(trades: CryptoTrade[]) {
   return { realized, remainingQuantity: inventory.quantity, remainingCost: inventory.cost };
 }
 
-export function calculateHousingLoanDeduction(records: HousingLoanRecord[], incomeTax: Decimal) {
+export function calculateHousingLoanDeduction(
+  records: HousingLoanRecord[],
+  incomeTax: Decimal.Value
+) {
   const latest = [...records].sort((a, b) => b.year - a.year)[0];
   if (!latest) return new Decimal(0);
   const deduction = new Decimal(latest.outstandingPrincipal)
     .times(latest.deductionRate)
     .toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
   const capped = Decimal.min(deduction, latest.maxDeduction);
-  return Decimal.min(capped, incomeTax);
+  return Decimal.min(capped, new Decimal(incomeTax));
 }

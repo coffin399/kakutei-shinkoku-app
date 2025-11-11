@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Decimal from "decimal.js";
 import type { TaxReturnSnapshot } from "@/lib/tax/types";
 import { createSampleSnapshot } from "@/lib/tax/sample";
 import {
@@ -58,10 +57,10 @@ export default function OutputsPage() {
   const housingResult = useMemo(() => {
     if (!housingCsv.trim()) return null;
     const parsed = parseHousingLoanCsv(housingCsv);
-    const incomeTaxDecimal = new Decimal(snapshot?.computation.incomeTax ?? 0);
+    const incomeTaxValue = snapshot?.computation.incomeTax ?? 0;
     const summary =
       parsed.errors.length === 0
-        ? calculateHousingLoanDeduction(parsed.rows, incomeTaxDecimal)
+        ? calculateHousingLoanDeduction(parsed.rows, incomeTaxValue)
         : null;
     return { parsed, summary };
   }, [housingCsv, snapshot?.computation.incomeTax]);
@@ -249,10 +248,12 @@ export default function OutputsPage() {
             resultContent={(() => {
               if (!housingResult?.summary) return null;
               const deduction = housingResult.summary;
+              const incomeTaxValue = snapshot?.computation.incomeTax ?? 0;
+              const remainingTax = Math.max(incomeTaxValue - deduction.toNumber(), 0);
               return (
                 <ul className="space-y-1 text-sm text-slate-200/90">
                   <li>控除額 (限度額反映済み): {deduction.toNumber().toLocaleString()} 円</li>
-                  <li>所得税額への適用後残高: {new Decimal(snapshot?.computation.incomeTax ?? 0).minus(deduction).toNumber().toLocaleString()} 円</li>
+                  <li>所得税額への適用後残高: {remainingTax.toLocaleString()} 円</li>
                 </ul>
               );
             })()}
