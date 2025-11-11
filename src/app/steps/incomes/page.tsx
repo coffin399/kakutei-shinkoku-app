@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import Link from "next/link";
 import { usePersistentState } from "@/hooks/usePersistentState";
 
@@ -30,6 +30,8 @@ const defaultRows: IncomeRow[] = incomeTemplates.map((template) => ({
   notes: "",
 }));
 
+const BLUE_SUMMARY_KEY = "kakutei.blue.summary";
+
 export default function IncomesPage() {
   const uniqueId = useId();
   const [rows, setRows, hydrated] = usePersistentState<IncomeRow[]>(STORAGE_KEY, defaultRows);
@@ -54,6 +56,40 @@ export default function IncomesPage() {
   const removeRow = (id: string) => {
     setRows((prev) => prev.filter((row) => row.id !== id));
   };
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      const stored = localStorage.getItem(BLUE_SUMMARY_KEY);
+      if (!stored) return;
+      const summary = JSON.parse(stored) as {
+        totalRevenue?: number;
+        totalExpenses?: number;
+        netIncome?: number;
+      };
+      if (typeof summary.netIncome !== "number" || Number.isNaN(summary.netIncome)) return;
+
+      const formatted = summary.netIncome === 0 ? "" : Math.round(summary.netIncome).toString();
+      setRows((prev) => {
+        const existingIndex = prev.findIndex((row) => row.id === "business");
+        if (existingIndex === -1) return prev;
+        const current = prev[existingIndex];
+        if (current.amount === formatted) return prev;
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...current,
+          amount: formatted,
+          notes:
+            summary.netIncome === 0
+              ? current.notes
+              : "青色帳簿センターの純利益を反映",
+        };
+        return updated;
+      });
+    } catch (error) {
+      console.error("Failed to apply blue ledger summary", error);
+    }
+  }, [hydrated, setRows]);
 
   if (!hydrated) {
     return (

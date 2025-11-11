@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePersistentState } from "@/hooks/usePersistentState";
 
 const STORAGE_KEY = "step-documents";
@@ -31,6 +32,14 @@ const defaultChecklist: ChecklistItem[] = [
   { id: "export", label: "PDF と XML を出力センターで確認", done: false },
 ];
 
+type GeminiSettingsStatus = {
+  baseUrl: string;
+  apiKeyCount: number;
+  lastUpdated?: string;
+};
+
+const GEMINI_STORAGE_KEY = "kakutei.gemini.config.v1";
+
 export default function DocumentsPage() {
   const [documents, setDocuments, hydrated] = usePersistentState<DocumentItem[]>(
     STORAGE_KEY,
@@ -40,6 +49,26 @@ export default function DocumentsPage() {
     `${STORAGE_KEY}-checklist`,
     defaultChecklist
   );
+  const [geminiStatus, setGeminiStatus] = useState<GeminiSettingsStatus | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(GEMINI_STORAGE_KEY);
+      if (!stored) {
+        setGeminiStatus(null);
+        return;
+      }
+      const parsed = JSON.parse(stored) as { baseUrl?: string; apiKeys?: string[] };
+      const apiKeys = Array.isArray(parsed.apiKeys) ? parsed.apiKeys.filter((key) => key.trim().length > 0) : [];
+      setGeminiStatus({
+        baseUrl: parsed.baseUrl ?? "",
+        apiKeyCount: apiKeys.length,
+      });
+    } catch (error) {
+      console.error("Failed to load Gemini settings", error);
+      setGeminiStatus(null);
+    }
+  }, []);
 
   const updateDocument = (id: string, partial: Partial<DocumentItem>) => {
     setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, ...partial } : doc)));
@@ -74,6 +103,33 @@ export default function DocumentsPage() {
 
         <section className="grid gap-5 rounded-3xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">書類リスト</h2>
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-xs text-emerald-100">
+            <p className="font-semibold text-emerald-200">AI OCR 連携の準備</p>
+            {geminiStatus ? (
+              <div className="flex flex-col gap-1 text-emerald-100/80">
+                <p>
+                  ベース URL: {geminiStatus.baseUrl || "未設定"} / API キー登録数: {geminiStatus.apiKeyCount}
+                </p>
+                <p>レシート読取設定を更新する場合は下のボタンから移動してください。</p>
+              </div>
+            ) : (
+              <p className="text-emerald-100/80">Gemini API キーが未設定です。OCR を利用する場合は設定を行いましょう。</p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <Link
+                href="/settings/gemini"
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 px-4 py-2 text-emerald-200 transition hover:border-emerald-300 hover:text-emerald-100"
+              >
+                Gemini 設定を開く
+              </Link>
+              <Link
+                href="/outputs"
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 px-4 py-2 text-emerald-200 transition hover:border-emerald-300 hover:text-emerald-100"
+              >
+                出力センターで結果を確認
+              </Link>
+            </div>
+          </div>
           <div className="grid gap-4">
             {documents.map((doc) => (
               <div key={doc.id} className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-slate-950/50 p-4">

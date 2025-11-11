@@ -49,6 +49,7 @@ type FinancialStatements = {
 };
 
 const STORAGE_KEY = "kakutei.blue.entries.v1";
+const SUMMARY_STORAGE_KEY = "kakutei.blue.summary";
 
 const ACCOUNT_GROUPS: {
   label: string;
@@ -208,6 +209,16 @@ export default function BlueReturnPage() {
   }, [entries]);
 
   const statements = useMemo(() => computeStatements(entries), [entries]);
+
+  useEffect(() => {
+    const summary = {
+      totalRevenue: statements.profitAndLoss.totalRevenue,
+      totalExpenses: statements.profitAndLoss.totalExpenses,
+      netIncome: statements.profitAndLoss.netIncome,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(summary));
+  }, [statements.profitAndLoss.netIncome, statements.profitAndLoss.totalExpenses, statements.profitAndLoss.totalRevenue]);
 
   const handleDraftChange = (field: keyof NewEntryState, value: string) => {
     setDraft((prev) => ({ ...prev, [field]: value }));

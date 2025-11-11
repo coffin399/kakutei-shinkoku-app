@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { usePersistentState } from "@/hooks/usePersistentState";
 
@@ -20,18 +20,11 @@ const defaultSummary = {
 type SummaryForm = typeof defaultSummary;
 
 type IncomeRow = {
-  id: string;
-  label: string;
-  category: string;
-  amount: string;
-  notes: string;
+  amount?: string;
 };
 
 type DeductionRow = {
-  id: string;
-  label: string;
-  amount: string;
-  notes: string;
+  amount?: string;
 };
 
 function parseAmount(value: string) {
@@ -46,6 +39,19 @@ export default function TaxSummaryPage() {
   const [incomeRows] = usePersistentState<IncomeRow[]>("step-incomes", []);
   const [deductionRows] = usePersistentState<DeductionRow[]>("step-deductions", []);
 
+  const progressiveRates = useMemo(
+    () => [
+      { threshold: 0, rate: 0.05, deduction: 0 },
+      { threshold: 1_950_000, rate: 0.1, deduction: 97_500 },
+      { threshold: 3_300_000, rate: 0.2, deduction: 427_500 },
+      { threshold: 6_950_000, rate: 0.23, deduction: 636_000 },
+      { threshold: 9_000_000, rate: 0.33, deduction: 1_536_000 },
+      { threshold: 18_000_000, rate: 0.4, deduction: 2_796_000 },
+      { threshold: 40_000_000, rate: 0.45, deduction: 4_796_000 },
+    ],
+    []
+  );
+
   const totals = useMemo(() => {
     const incomeTotal = incomeRows.reduce((sum, row) => sum + parseAmount(row.amount ?? ""), 0);
     const deductionTotal = deductionRows.reduce((sum, row) => sum + parseAmount(row.amount ?? ""), 0);
@@ -56,6 +62,59 @@ export default function TaxSummaryPage() {
       taxable,
     };
   }, [incomeRows, deductionRows]);
+
+  const autoValues = useMemo(() => {
+    const taxable = totals.taxable;
+    if (taxable <= 0) {
+      return {
+        taxableIncome: "",
+        incomeTax: "",
+        specialReconstructionTax: "",
+      };
+    }
+    const rate = [...progressiveRates].reverse().find((item) => taxable >= item.threshold);
+    const incomeTaxRaw = rate ? taxable * rate.rate - rate.deduction : 0;
+    const incomeTax = Math.max(Math.round(incomeTaxRaw), 0);
+    const specialTax = Math.max(Math.round(incomeTax * 0.021), 0);
+    return {
+      taxableIncome: String(Math.round(totals.taxable)),
+      incomeTax: String(incomeTax),
+      specialReconstructionTax: String(specialTax),
+    };
+  }, [progressiveRates, totals.taxable]);
+
+  const autoValueRef = useRef(autoValues);
+
+  useEffect(() => {
+    autoValueRef.current = autoValues;
+  }, [autoValues]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setSummary((prev) => {
+      const keys: (keyof typeof autoValues)[] = [
+        "taxableIncome",
+        "incomeTax",
+        "specialReconstructionTax",
+      ];
+      let changed = false;
+      const next = { ...prev };
+      keys.forEach((key) => {
+        const auto = autoValues[key];
+        if (!auto) return;
+        const prevAuto = autoValueRef.current[key];
+        const current = prev[key].trim();
+        if (current === "" || current === prevAuto) {
+          if (current !== auto) {
+            next[key] = auto;
+            changed = true;
+          }
+        }
+      });
+      if (!changed) return prev;
+      return next;
+    });
+  }, [autoValues, hydrated, setSummary]);
 
   const handleChange = (
     field: keyof SummaryForm
@@ -95,6 +154,17 @@ export default function TaxSummaryPage() {
           <p className="text-xs text-slate-200/70">
             ※ この課税所得は STEP 1〜3 で入力した金額から計算した概算値です。金額を確定する場合は所得控除の内訳を再確認してください。
           </p>
+          {autoValues.taxableIncome && (
+            <p className="text-xs text-emerald-200/80">
+              自動計算値を反映中: 課税所得 {Number(autoValues.taxableIncome).toLocaleString()} 円 / 所得税
+              {" "}
+              {autoValues.incomeTax ? `${Number(autoValues.incomeTax).toLocaleString()} 円` : "-"} / 復興特別所得税
+              {" "}
+              {autoValues.specialReconstructionTax
+                ? `${Number(autoValues.specialReconstructionTax).toLocaleString()} 円`
+                : "-"}
+            </p>
+          )}
         </section>
 
         <form className="grid gap-6 rounded-3xl border border-white/10 bg-white/5 p-6">

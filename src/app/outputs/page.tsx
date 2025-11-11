@@ -1,7 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { TaxReturnSnapshot } from "@/lib/tax/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePersistentState } from "@/hooks/usePersistentState";
+import type {
+  DeductionDetail,
+  IncomeDetail,
+  TaxReturnSnapshot,
+  AttachmentRecord,
+} from "@/lib/tax/types";
 import { createSampleSnapshot } from "@/lib/tax/sample";
 import {
   calculateCryptoPnL,
@@ -18,12 +24,194 @@ function stringifySnapshot(snapshot: TaxReturnSnapshot) {
   return JSON.stringify(snapshot, null, 2);
 }
 
+const SAMPLE_JSON = stringifySnapshot(createSampleSnapshot());
+
+const defaultBasicInfo = {
+  fullName: "",
+  fullNameKana: "",
+  myNumber: "",
+  address: "",
+  phone: "",
+  email: "",
+  filingCategory: "blue",
+  filingYear: String(new Date().getFullYear()),
+  memo: "",
+};
+
+type BasicInfoForm = typeof defaultBasicInfo;
+
+type StoredIncomeRow = {
+  id?: string;
+  label?: string;
+  category?: string;
+  amount?: string;
+  notes?: string;
+};
+
+type StoredDeductionRow = {
+  id?: string;
+  label?: string;
+  amount?: string;
+  notes?: string;
+};
+
+type TaxSummaryForm = {
+  taxableIncome: string;
+  incomeTax: string;
+  specialReconstructionTax: string;
+  municipalTax: string;
+  nationalHealthInsurance: string;
+  expectedRefund: string;
+  amountDue: string;
+  memo: string;
+};
+
+const defaultTaxSummary: TaxSummaryForm = {
+  taxableIncome: "",
+  incomeTax: "",
+  specialReconstructionTax: "",
+  municipalTax: "",
+  nationalHealthInsurance: "",
+  expectedRefund: "",
+  amountDue: "",
+  memo: "",
+};
+
+const INCOME_CATEGORIES: IncomeDetail["category"][] = [
+  "salary",
+  "business",
+  "real_estate",
+  "dividend",
+  "misc",
+  "crypto",
+  "temporary",
+  "other",
+];
+
+const DEDUCTION_KEYS: DeductionDetail["key"][] = [
+  "basic",
+  "spouse",
+  "spouse_special",
+  "dependents",
+  "social_insurance",
+  "life_insurance",
+  "earthquake_insurance",
+  "medical",
+  "donation",
+  "small_business_mutual",
+  "housing",
+  "other",
+];
+
+const DEDUCTION_LABELS: Record<DeductionDetail["key"], string> = {
+  basic: "基礎控除",
+  spouse: "配偶者控除",
+  spouse_special: "配偶者特別控除",
+  dependents: "扶養控除",
+  social_insurance: "社会保険料控除",
+  life_insurance: "生命保険料控除",
+  earthquake_insurance: "地震保険料控除",
+  medical: "医療費控除",
+  donation: "寄附金控除",
+  small_business_mutual: "小規模企業共済等掛金控除",
+  housing: "住宅ローン控除",
+  other: "その他控除",
+};
+
+const defaultIncomeRows: StoredIncomeRow[] = [];
+const defaultDeductionRows: StoredDeductionRow[] = [];
+type DocumentItem = {
+  id: string;
+  label: string;
+  status: AttachmentRecord["status"];
+  notes: string;
+};
+
+type ChecklistItem = {
+  id: string;
+  label: string;
+  done: boolean;
+};
+
+const defaultDocuments: DocumentItem[] = [];
+const defaultChecklist: ChecklistItem[] = [];
+
+function parseCurrency(value?: string | number | null) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (!value) return 0;
+  const cleaned = value.toString().replace(/,/g, "").trim();
+  if (!cleaned) return 0;
+  const parsed = Number(cleaned);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function normalizeIncomeCategory(value?: string): IncomeDetail["category"] {
+  if (value && (INCOME_CATEGORIES as string[]).includes(value)) {
+    return value as IncomeDetail["category"];
+  }
+  return "other";
+}
+
+function normalizeDeductionKey(value?: string): DeductionDetail["key"] {
+  if (value && (DEDUCTION_KEYS as string[]).includes(value)) {
+    return value as DeductionDetail["key"];
+  }
+  return "other";
+}
+
+function computeIncomeTaxBreakdown(taxable: number) {
+  if (taxable <= 0) {
+    return { incomeTax: 0, specialTax: 0 };
+  }
+  const brackets = [
+    { threshold: 0, rate: 0.05, deduction: 0 },
+    { threshold: 1_950_000, rate: 0.1, deduction: 97_500 },
+    { threshold: 3_300_000, rate: 0.2, deduction: 427_500 },
+    { threshold: 6_950_000, rate: 0.23, deduction: 636_000 },
+    { threshold: 9_000_000, rate: 0.33, deduction: 1_536_000 },
+    { threshold: 18_000_000, rate: 0.4, deduction: 2_796_000 },
+    { threshold: 40_000_000, rate: 0.45, deduction: 4_796_000 },
+  ];
+  const bracket = [...brackets].reverse().find((item) => taxable >= item.threshold);
+  const incomeTax = bracket ? Math.max(Math.round(taxable * bracket.rate - bracket.deduction), 0) : 0;
+  const specialTax = Math.max(Math.round(incomeTax * 0.021), 0);
+  return { incomeTax, specialTax };
+}
+
 export default function OutputsPage() {
-  const [rawSnapshot, setRawSnapshot] = useState(() => stringifySnapshot(createSampleSnapshot()));
+  const [rawSnapshot, setRawSnapshot] = useState(() => SAMPLE_JSON);
   const [status, setStatus] = useState<string | null>(null);
   const [medicalCsv, setMedicalCsv] = useState("");
   const [cryptoCsv, setCryptoCsv] = useState("");
   const [housingCsv, setHousingCsv] = useState("");
+
+  const [basicInfo, , basicHydrated] = usePersistentState<BasicInfoForm>(
+    "step-basic-info",
+    defaultBasicInfo
+  );
+  const [incomeRows, , incomesHydrated] = usePersistentState<StoredIncomeRow[]>(
+    "step-incomes",
+    defaultIncomeRows
+  );
+  const [deductionRows, , deductionsHydrated] = usePersistentState<StoredDeductionRow[]>(
+    "step-deductions",
+    defaultDeductionRows
+  );
+  const [taxSummary, , taxHydrated] = usePersistentState<TaxSummaryForm>(
+    "step-tax",
+    defaultTaxSummary
+  );
+  const [documents, , documentsHydrated] = usePersistentState<DocumentItem[]>(
+    "step-documents",
+    defaultDocuments
+  );
+  const [checklist, , checklistHydrated] = usePersistentState<ChecklistItem[]>(
+    "step-documents-checklist",
+    defaultChecklist
+  );
+
+  const hydratedAll =
+    basicHydrated && incomesHydrated && deductionsHydrated && taxHydrated && documentsHydrated && checklistHydrated;
 
   const snapshot = useMemo(() => {
     try {
@@ -33,10 +221,144 @@ export default function OutputsPage() {
     }
   }, [rawSnapshot]);
 
+  const totals = useMemo(() => {
+    const incomeTotal = incomeRows.reduce((sum, row) => sum + parseCurrency(row.amount), 0);
+    const deductionTotal = deductionRows.reduce((sum, row) => sum + parseCurrency(row.amount), 0);
+    const taxable = Math.max(incomeTotal - deductionTotal, 0);
+    return { incomeTotal, deductionTotal, taxable };
+  }, [incomeRows, deductionRows]);
+
   const totalIncome = useMemo(
     () => snapshot?.incomes.reduce((sum, income) => sum + income.amount, 0) ?? 0,
     [snapshot]
   );
+
+  const assembledSnapshot = useMemo(() => {
+    if (!hydratedAll) {
+      return null;
+    }
+
+    const filingYearParsed = parseInt(basicInfo.filingYear, 10);
+    const filingYear = Number.isFinite(filingYearParsed) ? filingYearParsed : new Date().getFullYear();
+    const filingCategory = basicInfo.filingCategory === "white" ? "white" : "blue";
+
+    const incomes: IncomeDetail[] = incomeRows
+      .map((row) => {
+        const amount = parseCurrency(row.amount);
+        if (amount <= 0) return null;
+        return {
+          category: normalizeIncomeCategory(row.category),
+          label: row.label?.trim() || "未分類所得",
+          amount,
+        } satisfies IncomeDetail;
+      })
+      .filter((item): item is IncomeDetail => item !== null);
+
+    const deductionEntries: DeductionDetail[] = deductionRows
+      .map((row) => {
+        const amount = parseCurrency(row.amount);
+        if (amount <= 0) return null;
+        const key = normalizeDeductionKey(row.id);
+        const label = row.label?.trim() || DEDUCTION_LABELS[key];
+        return {
+          key,
+          label,
+          amount,
+        } satisfies DeductionDetail;
+      })
+      .filter((item): item is DeductionDetail => item !== null);
+
+    const taxableFromSummary = parseCurrency(taxSummary.taxableIncome);
+    const baseTaxable = taxableFromSummary > 0 ? taxableFromSummary : totals.taxable;
+    const { incomeTax: autoIncomeTax, specialTax: autoSpecialTax } = computeIncomeTaxBreakdown(baseTaxable);
+    const computedIncomeTax = parseCurrency(taxSummary.incomeTax) || autoIncomeTax;
+    const computedSpecialTax = parseCurrency(taxSummary.specialReconstructionTax) || autoSpecialTax;
+
+    const municipalTax = parseCurrency(taxSummary.municipalTax);
+    const nationalHealthInsurance = parseCurrency(taxSummary.nationalHealthInsurance);
+    const amountDue = parseCurrency(taxSummary.amountDue);
+    const expectedRefund = parseCurrency(taxSummary.expectedRefund);
+
+    const snapshotPayload: TaxReturnSnapshot = {
+      taxpayer: {
+        fullName: basicInfo.fullName || "未入力",
+        fullNameKana: basicInfo.fullNameKana || undefined,
+        myNumber: basicInfo.myNumber || undefined,
+        address: basicInfo.address || "",
+        phone: basicInfo.phone || undefined,
+        email: basicInfo.email || undefined,
+        filingCategory,
+        filingYear,
+      },
+      incomes,
+      deductions: deductionEntries,
+      payments: [],
+      journal: {
+        totalSales: totals.incomeTotal,
+        totalExpenses: totals.deductionTotal,
+        netIncome: totals.incomeTotal - totals.deductionTotal,
+        assetTotal: 0,
+        liabilityTotal: 0,
+        equityTotal: 0,
+      },
+      attachments: documents.map<AttachmentRecord>((doc) => ({
+        label: doc.label,
+        required: true,
+        status: doc.status,
+      })),
+      computation: {
+        taxableIncome: baseTaxable,
+        incomeTax: computedIncomeTax,
+        specialReconstructionTax: computedSpecialTax,
+        municipalTax,
+        nationalHealthInsurance: nationalHealthInsurance > 0 ? nationalHealthInsurance : undefined,
+        expectedRefund,
+        amountDue,
+      },
+    };
+
+    return snapshotPayload;
+  }, [
+    basicInfo,
+    deductionRows,
+    hydratedAll,
+    incomeRows,
+    taxSummary,
+    totals.deductionTotal,
+    totals.incomeTotal,
+    totals.taxable,
+  ]);
+
+  const assembledJson = useMemo(() => (assembledSnapshot ? stringifySnapshot(assembledSnapshot) : null), [assembledSnapshot]);
+
+  const documentsProgress = useMemo(() => {
+    if (!documentsHydrated || documents.length === 0) {
+      return null;
+    }
+    const total = documents.length;
+    const done = documents.filter((doc) => doc.status === "verified").length;
+    const uploaded = documents.filter((doc) => doc.status !== "pending").length;
+    return { total, done, uploaded };
+  }, [documents, documentsHydrated]);
+
+  const checklistProgress = useMemo(() => {
+    if (!checklistHydrated || checklist.length === 0) {
+      return null;
+    }
+    const total = checklist.length;
+    const completed = checklist.filter((item) => item.done).length;
+    return { total, completed };
+  }, [checklist, checklistHydrated]);
+
+  const lastAutoSnapshotRef = useRef<string | null>(SAMPLE_JSON);
+
+  useEffect(() => {
+    if (!assembledJson) return;
+    if ((rawSnapshot === SAMPLE_JSON || rawSnapshot === lastAutoSnapshotRef.current) && rawSnapshot !== assembledJson) {
+      setRawSnapshot(assembledJson);
+    }
+    lastAutoSnapshotRef.current = assembledJson;
+  }, [assembledJson, rawSnapshot]);
 
   const medicalResult = useMemo(() => {
     if (!medicalCsv.trim()) return null;
@@ -64,6 +386,16 @@ export default function OutputsPage() {
         : null;
     return { parsed, summary };
   }, [housingCsv, snapshot?.computation.incomeTax]);
+
+  const refreshFromSteps = () => {
+    if (!assembledJson) {
+      setStatus("STEP データを読み込めませんでした。");
+      return;
+    }
+    setRawSnapshot(assembledJson);
+    lastAutoSnapshotRef.current = assembledJson;
+    setStatus("STEP データを反映しました。");
+  };
 
   const download = async (type: "pdf" | "xml") => {
     if (!snapshot) {
@@ -127,6 +459,14 @@ export default function OutputsPage() {
             </label>
             <div className="flex flex-wrap gap-3">
               <button
+                onClick={refreshFromSteps}
+                type="button"
+                disabled={!assembledSnapshot}
+                className="rounded-full border border-emerald-300/60 px-4 py-2 text-xs font-semibold text-emerald-200 transition hover:border-emerald-300 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                STEPデータを反映
+              </button>
+              <button
                 onClick={() => setRawSnapshot(stringifySnapshot(createSampleSnapshot()))}
                 type="button"
                 className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-emerald-400/60 hover:text-emerald-200"
@@ -155,6 +495,22 @@ export default function OutputsPage() {
 
           <div className="flex flex-col gap-6 rounded-3xl border border-white/10 bg-slate-900/60 p-6">
             <h2 className="text-xl font-semibold text-white">ダイジェスト</h2>
+            {(documentsProgress || checklistProgress) && (
+              <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-xs text-emerald-100">
+                <p className="font-semibold text-emerald-200">提出準備状況</p>
+                {documentsProgress && (
+                  <p>
+                    書類: 確認済み {documentsProgress.done}/{documentsProgress.total} 件
+                    （アップロード {documentsProgress.uploaded}/{documentsProgress.total}）
+                  </p>
+                )}
+                {checklistProgress && (
+                  <p>
+                    チェックリスト: 完了 {checklistProgress.completed}/{checklistProgress.total} 項目
+                  </p>
+                )}
+              </div>
+            )}
             {snapshot ? (
               <div className="space-y-4 text-sm text-slate-200/90">
                 <div>
