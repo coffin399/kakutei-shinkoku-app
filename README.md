@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+![kakutei-shinkoku-app](./public/og.png)
 
-## Getting Started
+# kakutei-shinkoku-app
 
-First, run the development server:
+モダンな UI で確定申告のワークフローをフルサポートする Web アプリケーションです。納税者情報の管理から、収入・控除の入力、帳簿作成、添付書類の整理までを一元化し、青色申告・白色申告のどちらにも対応します。
+
+## 特徴
+
+- **ワンストップ管理**: 基本情報、所得区分、控除、税額計算、書類管理、青色帳簿を一つのダッシュボードで整理。
+- **スタイリッシュな UI**: Tailwind CSS を活用したダークテーマ基調のモダンデザイン。
+- **ガイダンス付きフロー**: ステップごとの進捗確認と注意点により、申告漏れを防止。
+- **ローカルファースト設計**: データはローカルに保存。オフライン環境でも利用可能。
+- **クロスプラットフォーム配布を想定**: Tauri を用いた Windows / macOS / Linux のデスクトップパッケージングを計画。
+
+## 技術スタック
+
+- Next.js (App Router) + React 18
+- TypeScript / ESLint
+- Tailwind CSS
+- next/font (Geist)
+- 将来的に導入予定: Prisma + SQLite/PostgreSQL、NextAuth.js、Tauri
+
+## セットアップ
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで <http://localhost:3000> を開くとアプリを確認できます。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### ワンクリック起動スクリプト
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `start-windows.bat` : ダブルクリックで依存関係のインストール確認 → 開発サーバー起動までを自動化します。
+- `start-macos.sh` : `chmod +x start-macos.sh` で実行権限を付与した後、ターミナルで `./start-macos.sh` を実行してください。
 
-## Learn More
+## 主な npm スクリプト
 
-To learn more about Next.js, take a look at the following resources:
+| コマンド | 説明 |
+| --- | --- |
+| `npm run dev` | 開発サーバーを起動 (http://localhost:3000) |
+| `npm run build` | 本番ビルドの作成 |
+| `npm run start` | 本番ビルドを起動 |
+| `npm run lint` | ESLint によるコードチェック |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## ディレクトリ構成
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+├─ public/              静的アセット
+├─ src/app/             App Router エントリーポイント
+│  ├─ layout.tsx        全体レイアウト
+│  └─ page.tsx          トップページ (ダッシュボード)
+├─ src/styles/          グローバルスタイル (globals.css)
+└─ ...
+```
 
-## Deploy on Vercel
+## 今後のロードマップ
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. 入力フォームとバリデーション (React Hook Form + Zod)
+2. データ永続化レイヤー (Prisma + SQLite)
+3. 認証 (NextAuth.js)
+4. 帳簿機能 (仕訳入力、総勘定元帳、決算書自動生成)
+5. 添付書類アップロードとステータス管理
+6. Tauri によるデスクトップバンドルとインストーラ作成
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## ライセンス
+
+プロジェクトに適したライセンスを `LICENSE` ファイルとして追加してください。
+
+## コントリビュート
+
+Issues / Pull Request は歓迎します。バグ報告や改善提案がある場合はお気軽にお知らせください。
