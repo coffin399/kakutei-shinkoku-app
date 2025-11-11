@@ -1,3 +1,10 @@
+<div align="center">
+
+**現在開発中です。**  
+フィードバックを募集しています
+
+</div>
+
 ![kakutei-shinkoku-app](./public/og.png)
 
 # kakutei-shinkoku-app
