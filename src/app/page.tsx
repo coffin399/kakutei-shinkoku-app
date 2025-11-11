@@ -6,6 +6,7 @@ type Section = {
   description: string;
   items: string[];
   accent: string;
+  href: string;
 };
 
 const sections: Section[] = [
@@ -14,6 +15,7 @@ const sections: Section[] = [
     title: "基本情報",
     description: "納税者と申告の基本情報をまとめて管理",
     accent: "from-emerald-500/80 to-emerald-600/80",
+    href: "/steps/basic-info",
     items: [
       "氏名・住所・マイナンバーの登録",
       "申告区分（青色 / 白色）の選択",
@@ -25,6 +27,7 @@ const sections: Section[] = [
     title: "収入カテゴリ",
     description: "全ての所得区分を網羅した入力フォーム",
     accent: "from-sky-500/80 to-cyan-600/80",
+    href: "/steps/incomes",
     items: [
       "給与所得（源泉徴収票インポート対応）",
       "事業・不動産・配当・雑所得の仕訳",
@@ -36,6 +39,7 @@ const sections: Section[] = [
     title: "所得控除",
     description: "控除漏れを防ぐチェックリストと自動計算",
     accent: "from-amber-500/80 to-orange-600/80",
+    href: "/steps/deductions",
     items: [
       "基礎控除や扶養控除の自動反映",
       "社会保険料・生命保険・地震保険の控除",
@@ -47,6 +51,7 @@ const sections: Section[] = [
     title: "税額計算",
     description: "リアルタイムで税額・還付の結果を可視化",
     accent: "from-fuchsia-500/80 to-violet-600/80",
+    href: "/steps/tax",
     items: [
       "所得税額と復興特別所得税の自動計算",
       "源泉徴収額との照合",
@@ -58,6 +63,7 @@ const sections: Section[] = [
     title: "添付書類管理",
     description: "必要書類をクラウドライクに整理",
     accent: "from-rose-500/80 to-pink-600/80",
+    href: "/steps/documents",
     items: [
       "源泉徴収票・医療費領収書のアップロード",
       "寄附金受領証明書や控除証明書のステータス管理",
@@ -69,6 +75,7 @@ const sections: Section[] = [
     title: "青色申告帳簿",
     description: "仕訳から決算書までを一気通貫でサポート",
     accent: "from-lime-500/80 to-green-600/80",
+    href: "/blue",
     items: [
       "仕訳入力と総勘定元帳ビュー",
       "損益計算書と貸借対照表の自動生成",
@@ -153,14 +160,15 @@ export default function Home() {
 
           <section className="grid gap-6 lg:grid-cols-2">
             {sections.map((section) => (
-              <article
+              <Link
                 key={section.title}
+                href={section.href}
                 className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-lg transition hover:border-emerald-300/40 hover:shadow-emerald-400/20"
               >
-                <div
-                  className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${section.accent}`}
-                />
-                <div className="relative flex h-full flex-col gap-5 p-8">
+                <article className="flex h-full flex-col gap-5 p-8">
+                  <div
+                    className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${section.accent}`}
+                  />
                   <div className="space-y-3">
                     <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-widest text-white/60">
                       {section.step}
@@ -180,8 +188,8 @@ export default function Home() {
                       </li>
                     ))}
                   </ul>
-                </div>
-              </article>
+                </article>
+              </Link>
             ))}
           </section>
 
